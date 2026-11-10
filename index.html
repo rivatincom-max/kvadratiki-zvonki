@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14161a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Звонки">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Квадратики звонков</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; height: 100dvh; background: #14161a; color: #eee; font-family: system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 10px max(10px, env(safe-area-inset-left)); gap: 8px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+  header { display: flex; align-items: center; gap: 8px; }
+  h1 { font-size: 18px; margin: 0; flex: 1; }
+  header button { background: #2a2e36; color: #aaa; border: 0; border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+
+  #sum { background: #1e2128; border-radius: 12px; padding: 9px 12px; font-size: 14px; display: flex; justify-content: space-between; gap: 6px; }
+  #sum b { color: #fff; }
+
+  /* карточка статистики в стиле рабочей панели */
+  #stats { display: none; max-height: 58vh; overflow-y: auto; flex-direction: column; gap: 10px; }
+  .card { background: #1e2128; border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+  .card .top { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+  .card .top button { background: none; border: 0; color: #4cc38a; font-size: 13px; font-weight: 600; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .kpi small, .wide small { display: block; color: #8d96a3; font-size: 12px; line-height: 1.2; }
+  .kpi b, .wide b { font-size: 24px; color: #fff; }
+  .wide i, .ln i { font-style: normal; font-size: 12px; color: #8d96a3; margin-left: 4px; }
+  .wide { border-top: 1px solid #2c313a; padding-top: 10px; }
+  .ln { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; border-top: 1px solid #2c313a; padding-top: 10px; }
+  .ln b { color: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: #8d96a3; font-weight: 400; padding: 4px 2px; font-size: 12px; }
+  td { padding: 7px 2px; border-top: 1px solid #2c313a; vertical-align: top; }
+  td b { color: #fff; }
+  td i { display: block; font-style: normal; font-size: 11px; color: #8d96a3; }
+  .legend { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; font-size: 11px; }
+  .legend div { text-align: center; padding: 5px 2px; border-radius: 8px; background: #14161a; }
+  .legend b { display: block; font-size: 16px; }
+
+  #grid { flex: 1; min-height: 120px; overflow-y: auto; display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; align-content: start; }
+  .sq { aspect-ratio: 1; border-radius: 10px; background: #1e2128; border: 2px dashed #333945; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #111; }
+  .sq.next { border-color: #8aa; border-style: solid; }
+  .sq.sel { outline: 3px solid #fff; outline-offset: 1px; }
+  .sq.c0 { background: #1fa855; color: #fff; }
+  .sq.c1 { background: #a3e635; }
+  .sq.c2 { background: #f1c40f; }
+  .sq.c3 { background: #e74c3c; color: #fff; }
+  .sq.c4 { background: #5d6b82; color: #fff; }
+  .sq.c5 { background: #e67e22; color: #fff; }
+  .sq.c6 { background: #2dd4bf; }
+  .sq.c7 { background: #9b6b8f; color: #fff; }
+  .sq.c8 { background: #a93226; color: #fff; }
+  .sq.c9 { background: #3b82f6; color: #fff; }
+  .sq.c10 { background: #1e40af; color: #fff; }
+  .sq.c11 { background: #93c5fd; }
+  .sq.c12 { background: #dbeafe; }
+  .sq[class*=" c"] { border: 0; }
+
+  #selTools { display: none; flex-direction: column; gap: 6px; }
+  #hint { font-size: 13px; color: #9ab; text-align: center; }
+
+  #pad { display: flex; flex-direction: column; gap: 6px; padding-bottom: env(safe-area-inset-bottom); }
+  .row { display: grid; gap: 6px; }
+  .r3 { grid-template-columns: repeat(3, 1fr); }
+  .r2 { grid-template-columns: 1fr 1fr; }
+  .btn { border: 0; border-radius: 12px; padding: 6px 4px; min-height: 48px; font-size: 13px; font-weight: 700; line-height: 1.15; color: #111; }
+  .btn:active { transform: scale(.96); }
+  .b0 { background: #1fa855; color: #fff; } .b1 { background: #a3e635; } .b6 { background: #2dd4bf; } .b2 { background: #f1c40f; } .b3 { background: #e74c3c; color: #fff; }
+  .b4 { background: #5d6b82; color: #fff; } .b5 { background: #e67e22; color: #fff; } .b7 { background: #9b6b8f; color: #fff; } .b8 { background: #a93226; color: #fff; }
+  .b9 { background: #3b82f6; color: #fff; } .b10 { background: #1e40af; color: #fff; } .b11 { background: #93c5fd; } .b12 { background: #dbeafe; }
+  #moreBtn { background: #2a2e36; color: #ddd; }
+  #crossBtn { background: #8e5cf0; color: #fff; }
+  #undo { background: #2a2e36; color: #ccc; font-weight: 500; }
+  .panel { display: none; flex-direction: column; gap: 6px; background: #1b1f27; padding: 8px; border-radius: 14px; }
+  .panel small { color: #9ab; text-align: center; font-size: 12px; }
+  .prow { display: grid; grid-template-columns: 1.1fr 44px 1fr 44px 1fr; gap: 5px; align-items: center; }
+  .prow span { font-size: 13px; font-weight: 600; line-height: 1.15; }
+  .prow .btn { min-height: 46px; }
+  .pm { background: #2a2e36; color: #ccc; font-size: 20px; }
+  .po { background: #8e5cf0; color: #fff; } .pa { background: #1fa855; color: #fff; }
+  #cross, #uncross { background: #8e5cf0; color: #fff; } #uncross { background: #3a2f5c; }
+
+  @keyframes pop { 0% { transform: scale(.2); opacity: 0; } 60% { transform: scale(1.22); opacity: 1; } 100% { transform: scale(1); } }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px) rotate(-3deg); } 40% { transform: translateX(6px) rotate(3deg); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+  @keyframes glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(138,170,170,.55); } 50% { box-shadow: 0 0 0 7px rgba(138,170,170,0); } }
+  @keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg) scale(1.04); } 75% { transform: rotate(4deg) scale(1.04); } }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.7); color: #4cc38a; } 100% { transform: scale(1); } }
+  @keyframes rise { 0% { opacity: 1; transform: translate(-50%, 0) scale(.7); } 100% { opacity: 0; transform: translate(-50%, -120px) scale(1.6); } }
+  @keyframes ripple { to { transform: scale(14); opacity: 0; } }
+  @keyframes shimmer { to { background-position: 200% 0; } }
+  @keyframes drift { from { transform: translate(-4%, -3%) scale(1); } to { transform: translate(4%, 3%) scale(1.15); } }
+  @keyframes party { 0% { opacity: 0; transform: translateX(-50%) scale(.3); } 25% { opacity: 1; transform: translateX(-50%) scale(1.2); } 75% { opacity: 1; transform: translateX(-50%) scale(1); } 100% { opacity: 0; transform: translateX(-50%) scale(1.4); } }
+  body::before { content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none; background: radial-gradient(circle at 20% 30%, rgba(142,92,240,.2), transparent 40%), radial-gradient(circle at 80% 70%, rgba(76,195,138,.16), transparent 40%), radial-gradient(circle at 60% 10%, rgba(59,130,246,.14), transparent 35%); animation: drift 12s ease-in-out infinite alternate; }
+  h1 { background: linear-gradient(90deg, #eee, #8e5cf0, #4cc38a, #eee); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 5s linear infinite; }
+  .sq.pop { animation: pop .5s cubic-bezier(.2, 1.5, .4, 1); }
+  .sq.shake { animation: shake .45s; }
+  .sq.next { animation: glow 1.6s infinite; }
+  .sq.sel { animation: wiggle .6s infinite; }
+  .panel, #stats { animation: slideUp .25s ease-out; }
+  #sum b.bump { display: inline-block; animation: bump .45s; }
+  .btn { position: relative; overflow: hidden; }
+  .ripple { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: rgba(255,255,255,.5); animation: ripple .6s ease-out forwards; pointer-events: none; }
+  .floatxp { position: fixed; z-index: 52; font-size: 30px; pointer-events: none; animation: rise 1s ease-out forwards; }
+  #fx { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+  #party { position: fixed; left: 50%; top: 30%; font-size: 40px; font-weight: 900; color: #fff; text-shadow: 0 0 20px #8e5cf0, 0 0 40px #4cc38a; opacity: 0; pointer-events: none; z-index: 51; white-space: nowrap; }
+  #party.on { animation: party 1.8s; }
+  #toast { position: fixed; left: 50%; bottom: 160px; transform: translateX(-50%) translateY(10px); background: #8e5cf0; color: #fff; padding: 8px 14px; border-radius: 20px; font-weight: 700; opacity: 0; pointer-events: none; transition: .25s; white-space: nowrap; z-index: 51; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  #sync { display: none; background: #1e2128; border-radius: 12px; padding: 10px; gap: 8px; flex-direction: column; }
+  #sync textarea { width: 100%; height: 80px; background: #14161a; color: #ddd; border: 1px solid #333945; border-radius: 8px; font-size: 12px; user-select: text; }
+  #sync .row2 { display: flex; gap: 8px; }
+  #sync button { flex: 1; background: #2a2e36; color: #ddd; border: 0; border-radius: 10px; padding: 10px; font-size: 14px; }
+  #msg { font-size: 13px; color: #8c8; min-height: 16px; }
+</style>
+</head>
+<body>
+<header><h1>Звонки</h1><button id="syncBtn">💾 Прогресс</button><button id="reset">Сбросить</button></header>
+<div id="sync">
+  <textarea id="code" placeholder="Здесь будет код прогресса. Чтобы загрузить — вставь код сюда."></textarea>
+  <div class="row2"><button id="exp">Получить код</button><button id="imp">Загрузить код</button></div>
+  <div id="msg"></div>
+</div>
+<div id="sum"></div>
+<div id="stats"></div>
+<div id="grid"></div>
+<div id="selTools">
+  <div id="hint"></div>
+  <div class="row r2"><button class="btn" id="cross">+ продукт в квадрате</button><button class="btn" id="uncross">− продукт в квадрате</button></div>
+</div>
+<div id="pad">
+  <div id="crosspad" class="panel"></div>
+  <div id="morepad" class="panel">
+    <div class="row r2">
+      <button class="btn b8" data-c="8">Отказ, кросс предлагал</button>
+      <button class="btn b5" data-c="5">Отказ от презентации</button>
+      <button class="btn b4" data-c="4">Сбой звонка</button>
+      <button class="btn b7" data-c="7">Сбой на кроссе</button>
+    </div>
+  </div>
+  <div class="row r3">
+    <button class="btn b0" data-c="0">Продажа + кросс</button>
+    <button class="btn b1" data-c="1">Продажа, кросс отказ</button>
+    <button class="btn b6" data-c="6">Продажа без кросса</button>
+    <button class="btn b2" data-c="2">Перезвон</button>
+    <button class="btn b3" data-c="3">Отказ</button>
+    <button class="btn" id="moreBtn">Ещё ▾</button>
+  </div>
+  <div class="row r3">
+    <button class="btn b9" data-c="9">СБОЛ</button>
+    <button class="btn" id="crossBtn">Кросс-продукты ▾</button>
+    <button class="btn" id="undo">↩ Отменить</button>
+  </div>
+</div>
+<canvas id="fx"></canvas><div id="party"></div><div id="toast"></div>
+<script>
+const NAMES = ["Продажа + кросс", "Кросс отказ", "Перезвон", "Отказ", "Сбой звонка", "Отказ от презентации", "Продажа без кросса", "Сбой на кроссе", "Отказ, кросс предлагал", "СБОЛ", "СБОЛ, кросс продал", "СБОЛ, кросс не продал", "СБОЛ, кросс предложил"];
+const PRODUCTS = ["Кредитная карта", "Сберпрайм", "Вклад Лучший процент"];
+const TOTAL = 300;
+const blank = () => [new Array(TOTAL).fill(-1), new Array(TOTAL).fill(0)];
+let [sq, cr] = blank();
+let pr = PRODUCTS.map(() => [0, 0]); // по продуктам: [предложений, согласий]
+let pending = 0;                     // согласий по кроссу в текущем (ещё не отмеченном) звонке
+const pad = (a, f) => a.concat(new Array(Math.max(0, TOTAL - a.length)).fill(f));
+// старый формат (4 статуса): 0 продажа, 1 перезвон, 2 отказ, 3 не дозвон
+const fromOld = (s, c) => s.map((v, i) => v < 0 ? -1 : v === 0 ? ((c[i] || 0) > 0 ? 0 : 1) : v + 1);
+const rd = k => { try { const x = JSON.parse(localStorage.getItem(k)); return Array.isArray(x) ? x : null; } catch (e) { return null; } };
+const setPr = flat => { if (Array.isArray(flat) && flat.length === PRODUCTS.length * 2) pr = PRODUCTS.map((_, i) => [Math.max(0, +flat[i * 2] || 0), Math.max(0, +flat[i * 2 + 1] || 0)]); };
+(function load() {
+  setPr(rd("pr2")); pending = (rd("pa") || [0])[0] || 0;
+  const s2 = rd("sq2"), c2 = rd("cr2");
+  if (s2) { sq = pad(s2, -1); cr = pad(c2 || [], 0); return; }
+  const s1 = rd("sq"), c1 = rd("cr");
+  if (s1) { sq = pad(fromOld(s1, c1 || []), -1); cr = pad(c1 || [], 0); }
+})();
+const save = () => { try {
+  localStorage.setItem("sq2", JSON.stringify(sq)); localStorage.setItem("cr2", JSON.stringify(cr));
+  localStorage.setItem("pr2", JSON.stringify(pr.flat())); localStorage.setItem("pa", JSON.stringify([pending]));
+} catch (e) {} };
+const $ = id => document.getElementById(id);
+const grid = $("grid"), stats = $("stats"), sum = $("sum"), morepad = $("morepad"), crosspad = $("crosspad"), moreBtn = $("moreBtn"), crossBtn = $("crossBtn");
+const lastIdx = () => { let l = -1; sq.forEach((v, i) => { if (v >= 0) l = i; }); return l; };
+let sel = -1;        // выбранный для правки квадрат, -1 = нет
+let showStats = false;
+const target = () => sel >= 0 ? sel : lastIdx();
+const buzz = () => { if (navigator.vibrate) try { navigator.vibrate(15); } catch (e) {} };
+const OK = [0, 1, 6, 9, 10, 11, 12];
+const EMO = { 0: "💰", 1: "✅", 6: "✅", 9: "🤝", 10: "🤝", 11: "🤝", 12: "🤝", 2: "📞", 3: "❌", 4: "📵", 5: "🙅", 7: "💔", 8: "😬" };
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const prevSum = [];
+let popIdx = -1, popKind = "pop", lastPt = { x: innerWidth / 2, y: innerHeight * 0.7 };
+const restart = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("show"), 1400); }
+// конфетти
+const fx = $("fx"), fctx = fx.getContext("2d"); let parts = [], raf = 0;
+const sizeFx = () => { fx.width = innerWidth; fx.height = innerHeight; };
+addEventListener("resize", sizeFx); sizeFx();
+function burst(x, y, n, power = 1) {
+  if (reduce) return;
+  const cols = ["#4cc38a", "#f1c40f", "#8e5cf0", "#3b82f6", "#e74c3c", "#2dd4bf", "#ffffff"];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = (3 + Math.random() * 6) * power;
+    parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 4 * power, r: 3 + Math.random() * 4, c: cols[i % cols.length], life: 60 + Math.random() * 40, rot: Math.random() * 6, vr: (Math.random() - .5) * .4 });
+  }
+  if (!raf) raf = requestAnimationFrame(tick);
+}
+function tick() {
+  fctx.clearRect(0, 0, fx.width, fx.height);
+  parts = parts.filter(p => p.life > 0);
+  for (const p of parts) {
+    p.x += p.vx; p.y += p.vy; p.vy += .25; p.vx *= .99; p.life--; p.rot += p.vr;
+    fctx.save(); fctx.globalAlpha = Math.min(1, p.life / 30); fctx.translate(p.x, p.y); fctx.rotate(p.rot);
+    fctx.fillStyle = p.c; fctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); fctx.restore();
+  }
+  raf = parts.length ? requestAnimationFrame(tick) : 0;
+  if (!parts.length) fctx.clearRect(0, 0, fx.width, fx.height);
+}
+function floatEmoji(t) {
+  const el = document.createElement("div"); el.className = "floatxp"; el.textContent = t;
+  el.style.left = lastPt.x + "px"; el.style.top = (lastPt.y - 30) + "px";
+  document.body.appendChild(el); setTimeout(() => el.remove(), 1000);
+}
+// волна на кнопках + запоминаем, где тапнули
+document.addEventListener("pointerdown", e => {
+  lastPt = { x: e.clientX, y: e.clientY };
+  const b = e.target.closest && e.target.closest(".btn"); if (!b || reduce) return;
+  const r = b.getBoundingClientRect(), s = document.createElement("span");
+  s.className = "ripple"; s.style.left = (e.clientX - r.left) + "px"; s.style.top = (e.clientY - r.top) + "px";
+  b.appendChild(s); setTimeout(() => s.remove(), 650);
+}, true);
+// реакция на новый звонок: эмодзи, конфетти, каждые 10 звонков — праздник
+function celebrate(c, total) {
+  floatEmoji(EMO[c] || "📞");
+  if (OK.includes(c)) { burst(lastPt.x, lastPt.y, c === 0 ? 70 : 45, c === 0 ? 1.2 : 1); toast(NAMES[c] + " " + EMO[c]); }
+  if (total > 0 && total % 10 === 0) {
+    $("party").textContent = `🎉 ${total} звонков!`; restart($("party"), "on");
+    burst(innerWidth * .2, innerHeight * .5, 60, 1.3); burst(innerWidth * .8, innerHeight * .5, 60, 1.3); burst(innerWidth * .5, innerHeight * .35, 90, 1.5);
+    if (navigator.vibrate) try { navigator.vibrate([40, 40, 80]); } catch (e) {}
+  }
+}
+const pct = (n, base) => base ? `${+(n / base * 100).toFixed(2)}%` : "0%";
+
+// открыта только одна панель: more / cross / stats / none
+function openPanel(name) {
+  showStats = name === "stats";
+  morepad.style.display = name === "more" ? "flex" : "none";
+  crosspad.style.display = name === "cross" ? "flex" : "none";
+  moreBtn.textContent = name === "more" ? "Ещё ▴" : "Ещё ▾";
+  crossBtn.textContent = name === "cross" ? "Кросс-продукты ▴" : "Кросс-продукты ▾";
+  render();
+}
+const isOpen = n => (n === "more" && morepad.style.display === "flex") || (n === "cross" && crosspad.style.display === "flex") || (n === "stats" && showStats);
+
+function counts() {
+  const cnt = new Array(13).fill(0);
+  sq.forEach(v => { if (v >= 0) cnt[v]++; });
+  const total = cnt.reduce((x, y) => x + y, 0);
+  const o = {
+    cnt, total,
+    pres: total - cnt[4] - cnt[5],              // презентации: все, кроме сбоя звонка и отказа от презентации
+    agree: cnt[0] + cnt[1] + cnt[6] + cnt[9] + cnt[10] + cnt[11] + cnt[12], // согласия = продажи + СБОЛ
+    sbol: cnt[9] + cnt[10] + cnt[11] + cnt[12], // СБОЛ = оформит сам
+    offers: pr.reduce((s, x) => s + x[0], 0),
+    agrees: pr.reduce((s, x) => s + x[1], 0)
+  };
+  return o;
+}
+function statsText(o) {
+  return [`Дозвоны: ${o.total}`, `Презентации: ${o.pres}`, `Согласия: ${o.agree}`,
+    `Всего предложений по кросс-продуктам: ${o.offers} (${pct(o.offers, o.total)} от дозвонов)`,
+    `СБОЛ: ${o.sbol} (${pct(o.sbol, o.total)} от дозвона)`, `Кросс-продукты:`]
+    .concat(PRODUCTS.map((n, i) => `${n}: предложений ${pr[i][0]} (${pct(pr[i][0], o.offers)} от дозвона), согласий ${pr[i][1]} (${pct(pr[i][1], pr[i][0])} от предложений)`)).join("\n");
+}
+
+function render() {
+  const next = sq.indexOf(-1);
+  grid.innerHTML = "";
+  sq.forEach((v, i) => {
+    const d = document.createElement("div");
+    if (cr[i] > 0) d.textContent = "+" + cr[i];
+    d.className = "sq" + (v >= 0 ? " c" + v : "") + (i === next && sel < 0 ? " next" : "") + (i === sel ? " sel" : "") + (i === popIdx ? " " + popKind : "");
+    d.onclick = () => { sel = sel === i ? -1 : i; render(); };
+    grid.appendChild(d);
+    if (sel < 0 ? i === next : i === sel) setTimeout(() => d.scrollIntoView({ block: "nearest" }), 0);
+  });
+  popIdx = -1;
+  $("selTools").style.display = sel >= 0 ? "flex" : "none";
+  $("hint").textContent = sel >= 0 ? `Правка квадрата №${sel + 1}: выбери цвет. Тап по нему ещё раз — отмена.` : "";
+  $("undo").textContent = sel >= 0 ? "🗑 Очистить" : "↩ Отменить";
+
+  const o = counts();
+  sum.innerHTML = `<span>Дозвоны <b>${o.total}</b></span><span>Согл. <b>${o.agree}</b></span><span>СБОЛ <b>${o.sbol}</b></span><span>Кросс <b>${o.offers}</b></span><span>${showStats ? "▴" : "▾"}</span>`;
+  sum.querySelectorAll("b").forEach((el, i) => { if (prevSum[i] !== undefined && prevSum[i] !== el.textContent && !reduce) el.classList.add("bump"); prevSum[i] = el.textContent; });
+  stats.style.display = showStats ? "flex" : "none";
+  if (showStats) {
+    stats.innerHTML = `<div class="card">
+      <div class="top"><span>Статистика</span><button id="copyStat">Копировать статистику</button></div>
+      <div class="kpis">
+        <div class="kpi"><small>Дозвоны по проекту</small><b>${o.total}</b></div>
+        <div class="kpi"><small>Презентации по проекту</small><b>${o.pres}</b></div>
+        <div class="kpi"><small>Согласия по проекту</small><b>${o.agree}</b></div>
+      </div>
+      <div class="wide"><small>Всего предложений по кросс-продуктам</small><b>${o.offers}</b><i>(${pct(o.offers, o.total)} от дозвонов)</i></div>
+      <div class="ln"><span>СБОЛ:</span><span><b>${o.sbol}</b><i>(${pct(o.sbol, o.total)} от дозвона)</i></span></div>
+      <table><tr><th>Кросс-продукты</th><th>Предложений</th><th>Согласий</th></tr>
+        ${PRODUCTS.map((n, i) => `<tr><td>${n}</td><td><b>${pr[i][0]}</b><i>(${pct(pr[i][0], o.offers)} от дозвона)</i></td><td><b>${pr[i][1]}</b><i>(${pct(pr[i][1], pr[i][0])} от предложений)</i></td></tr>`).join("")}
+      </table>
+    </div>
+    <div class="legend">${NAMES.map((n, i) => `<div><b>${o.cnt[i]}</b>${n}</div>`).join("")}</div>`;
+    $("copyStat").onclick = () => {
+      const t = statsText(o);
+      $("code").value = t; $("sync").style.display = "flex";
+      try { navigator.clipboard.writeText(t).then(() => $("msg").textContent = "Статистика скопирована.", () => $("msg").textContent = "Скопируй текст вручную."); }
+      catch (e) { $("msg").textContent = "Скопируй текст вручную."; }
+    };
+  }
+  crosspad.innerHTML = `<small>В этом звонке согласий по кроссу: <b>${pending}</b>. Потом нажми цвет звонка.</small>`
+    + PRODUCTS.map((n, i) => `<div class="prow"><span>${n}</span>
+      <button class="btn pm" data-act="o-" data-p="${i}">−</button><button class="btn po" data-act="o+" data-p="${i}">Предл. ${pr[i][0]}</button>
+      <button class="btn pm" data-act="a-" data-p="${i}">−</button><button class="btn pa" data-act="a+" data-p="${i}">Согл. ${pr[i][1]}</button></div>`).join("");
+}
+sum.onclick = () => openPanel(showStats ? "none" : "stats");
+moreBtn.onclick = () => openPanel(isOpen("more") ? "none" : "more");
+crossBtn.onclick = () => openPanel(isOpen("cross") ? "none" : "cross");
+crosspad.onclick = e => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const x = pr[+b.dataset.p], a = b.dataset.act;
+  if (a === "o+") x[0]++;
+  else if (a === "o-") x[0] = Math.max(x[0] - 1, x[1]);
+  else if (a === "a+") { x[1]++; x[0] = Math.max(x[0], x[1]); pending++; floatEmoji("🛒"); burst(lastPt.x, lastPt.y, 40, 1); toast("Кросс! " + PRODUCTS[+b.dataset.p]); }
+  else if (a === "a-" && x[1] > 0) { x[1]--; pending = Math.max(0, pending - 1); }
+  save(); render(); buzz();
+};
+document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => {
+  const isNew = sel < 0, c = +b.dataset.c, withX = c === 0 || c === 10;
+  let i = sel;
+  if (i >= 0) { cr[i] = withX ? Math.max(cr[i], 1) : 0; }
+  else {
+    i = sq.indexOf(-1);
+    if (i < 0) { sq = sq.concat(new Array(TOTAL).fill(-1)); cr = cr.concat(new Array(TOTAL).fill(0)); i = sq.indexOf(-1); }
+    cr[i] = withX ? Math.max(1, pending) : 0; pending = 0; // новый звонок: берём согласия из панели кросс-продуктов
+  }
+  popIdx = i; popKind = [3, 5, 8, 4, 7].includes(c) ? "shake" : "pop";
+  sq[i] = c; sel = -1; save(); openPanel("none"); buzz();
+  if (isNew) celebrate(c, counts().total);
+});
+$("undo").onclick = () => {
+  const l = target();
+  if (l >= 0) { sq[l] = -1; cr[l] = 0; sel = -1; save(); render(); }
+};
+// правка числа продуктов в выбранном квадрате (счётчики по продуктам не меняются)
+$("cross").onclick = () => {
+  const l = target();
+  if (l >= 0 && [0, 1, 6, 9, 10, 11, 12].includes(sq[l])) { sq[l] = sq[l] >= 9 ? 10 : 0; cr[l]++; save(); render(); buzz(); }
+};
+$("uncross").onclick = () => {
+  const l = target();
+  if (l >= 0 && (sq[l] === 0 || sq[l] === 10) && cr[l] > 0) { cr[l]--; if (cr[l] === 0) sq[l] = sq[l] === 0 ? 1 : 11; save(); render(); }
+};
+let armed = false;
+$("reset").onclick = e => {
+  if (!armed) { armed = true; e.target.textContent = "Точно?"; setTimeout(() => { armed = false; e.target.textContent = "Сбросить"; }, 2500); return; }
+  [sq, cr] = blank(); pr = PRODUCTS.map(() => [0, 0]); pending = 0; sel = -1; armed = false; e.target.textContent = "Сбросить"; save(); render();
+};
+
+// Перенос прогресса: код KV3 (новый), KV2 и KV1 (старые) тоже принимаются
+const sync = $("sync"), code = $("code"), msg = $("msg");
+$("syncBtn").onclick = () => { sync.style.display = sync.style.display === "flex" ? "none" : "flex"; msg.textContent = ""; };
+$("exp").onclick = () => {
+  const n = Math.max(lastIdx() + 1, 0);
+  code.value = "KV3:" + JSON.stringify({ s: sq.slice(0, n), c: cr.slice(0, n), p: pr.flat(), a: pending });
+  code.select();
+  try { navigator.clipboard.writeText(code.value).then(() => msg.textContent = "Код скопирован. Если нет — выдели и скопируй вручную.", () => msg.textContent = "Скопируй код вручную."); }
+  catch (e) { msg.textContent = "Скопируй код вручную."; }
+};
+$("imp").onclick = () => {
+  try {
+    const t = code.value.trim(), v = t.slice(0, 4);
+    if (!["KV1:", "KV2:", "KV3:"].includes(v)) throw 0;
+    const o = JSON.parse(t.slice(4));
+    if (!Array.isArray(o.s) || !Array.isArray(o.c)) throw 0;
+    sq = pad(v === "KV1:" ? fromOld(o.s, o.c) : o.s, -1);
+    cr = pad(o.c, 0); sel = -1;
+    if (v === "KV3:") { setPr(o.p); pending = +o.a || 0; }
+    save(); render(); msg.textContent = "Прогресс загружен.";
+  } catch (e) { msg.textContent = "Не получилось: код неверный или обрезан."; }
+};
+render();
+// работа без интернета: сохраняем страницу в кэш телефона
+if ("serviceWorker" in navigator) { try { navigator.serviceWorker.register("sw.js").catch(() => {}); } catch (e) {} }
+</script>
+</body>
+</html>
